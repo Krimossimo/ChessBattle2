@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChessBattle - Blue Ultimate</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;500&display=swap" rel="stylesheet">
+    
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <style>
+        /* --- THEME GAMING BLUE --- */
+        :root {
+            --bg-dark: #0a0e17;
+            --panel-bg: #131a26;
+            --accent: #00d2ff; /* Bleu Néon */
+            --accent-hover: #0077ff;
+            --text-main: #ffffff;
+            --text-muted: #8899ac;
+            --border: #1f2e40;
+            --danger: #ff4757;
+            --success: #00d2ff;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- FONTS & TITRES --- */
+        h1, h2, h3, .gaming-font { font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
+        
+        /* --- LAYOUTS --- */
+        .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; position: absolute; top:0; left:0; overflow-y: auto;}
+        .active-screen { display: flex; }
+
+        /* --- NOUVELLE BARRE DU HAUT (Bannière Compacte) --- */
+        .top-bar {
+            width: 100%;
+            height: 60px;
+            background: rgba(19, 26, 38, 0.95);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 100;
+            justify-content: space-between;
+        }
+
+        .player-info-compact {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(0, 210, 255, 0.1);
+            padding: 5px 15px;
+            border-radius: 30px;
+            border: 1px solid rgba(0, 210, 255, 0.2);
+        }
+
+        .flag-icon { font-size: 1.2rem; }
+        .pseudo-text { font-family: 'Orbitron'; color: var(--accent); font-weight: bold; font-size: 1rem; }
+        .points-pill { background: #000; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; color: #fff; border: 1px solid #333; }
+        
+        .logout-btn-mini {
+            background: var(--danger);
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex; justify-content: center; align-items: center;
+            transition: 0.2s;
+            margin-left: 10px;
+        }
+        .logout-btn-mini:hover { transform: scale(1.1); box-shadow: 0 0 10px var(--danger); }
+
+        /* --- AUTH BOX --- */
+        .auth-container { height: 100%; display: flex; justify-content: center; align-items: center; width: 100%; }
+        .auth-box {
+            background: var(--panel-bg); padding: 40px; border-radius: 10px;
+            width: 380px; text-align: center; border: 1px solid var(--accent);
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.1);
+        }
+        input, select {
+            width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: 1px solid var(--border);
+            background: #0a0e17; color: white; box-sizing: border-box; font-family: 'Roboto';
+        }
+        input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 5px rgba(0, 210, 255, 0.3); }
+
+        /* --- MENU PRINCIPAL --- */
+        .main-menu-content {
+            margin-top: 80px; /* Espace pour la top-bar */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        .main-title {
+            font-size: 4rem;
+            color: var(--text-main);
+            text-shadow: 0 0 20px var(--accent);
+            margin-bottom: 10px;
+            background: -webkit-linear-gradient(#fff, #8899ac);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .menu-grid { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 1000px; margin-top: 40px;}
+        .menu-card {
+            background: var(--panel-bg); width: 200px; padding: 25px; border-radius: 10px;
+            text-align: center; cursor: pointer; border: 1px solid transparent; transition: 0.3s;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            position: relative; overflow: hidden;
+        }
+        .menu-card:hover { transform: translateY(-5px); border-color: var(--accent); box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); }
+        .menu-card i { font-size: 3rem; color: #3a4b60; transition: 0.3s; }
+        .menu-card:hover i { color: var(--accent); text-shadow: 0 0 10px var(--accent); }
+        
+        .card-highlight { border-color: rgba(0, 210, 255, 0.3); }
+        .card-highlight i { color: var(--accent); }
+
+        /* --- BOUTONS --- */
+        .btn {
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover)); 
+            color: #000; border: none; padding: 12px 20px;
+            border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%;
+            text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;
+        }
+        .btn:hover { filter: brightness(1.2); box-shadow: 0 0 15px rgba(0, 210, 255, 0.4); }
+        .btn-red { background: linear-gradient(135deg, #ff4757, #c0392b); color: white; }
+        .btn-small { width: auto; padding: 8px 15px; font-size: 0.8rem; }
+        
+        .corner-btn {
+            position: fixed; bottom: 20px; padding: 15px; background: var(--panel-bg); border: 2px solid var(--border);
+            color: white; border-radius: 50%; width: 60px; height: 60px; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; font-size: 1.5rem;
+            transition: 0.2s; z-index: 100;
+        }
+        .corner-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 15px rgba(0, 210, 255, 0.3); }
+        #btn-friends { left: 30px; }
+        #btn-settings { right: 30px; }
+
+        .badge { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 0.8rem; display: flex; justify-content: center; align-items: center; font-weight: bold; animation: pulse 1s infinite;}
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.2);} 100% {transform: scale(1);} }
+
+        /* --- JEU --- */
+        #game-layout { display: flex; gap: 30px; margin-top: 20px; height: 80%; justify-content: center; }
+        #board-container { width: 600px; display: flex; flex-direction: column; gap: 10px; }
+        #sidebar { width: 300px; background: var(--panel-bg); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; border: 1px solid var(--border); }
+        
+        .timer-box { font-family: 'Orbitron'; font-size: 1.5rem; background: #080b12; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; border-left: 5px solid #333; }
+        .timer-active { border-color: var(--accent); box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
+
+        .graveyard { height: 40px; background: rgba(0,0,0,0.3); border-radius: 5px; display: flex; align-items: center; padding: 0 10px; overflow: hidden;}
+        .graveyard img { width: 30px; margin-right: -10px; }
+
+        /* --- MODALS --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-box { background: var(--panel-bg); width: 500px; padding: 30px; border-radius: 15px; position: relative; border: 1px solid var(--accent); box-shadow: 0 0 30px rgba(0, 210, 255, 0.2); }
+        .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 1.5rem; color: #888; }
+        .close-btn:hover { color: white; }
+
+        .friend-row { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 5px; border-radius: 5px; align-items: center;}
+        .online-dot { width: 10px; height: 10px; border-radius: 50%; background: #333; display: inline-block; margin-right: 8px;}
+        .is-online { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+        .flying-piece { position: absolute; z-index: 9999; pointer-events: none; transition: all 0.6s ease-in-out; width: 50px; }
+    </style>
+</head>
+<body>
+
+    <div id="screen-auth" class="screen active-screen">
+        <div class="auth-container">
+            <div class="auth-box" id="login-box">
+                <h1 class="gaming-font" style="color:var(--accent); font-size:2.5rem;">CHESS BATTLE</h1>
+                <p style="letter-spacing: 3px; color: var(--text-muted);">BLUE EDITION</p>
+                <input type="text" id="log-pseudo" placeholder="Pseudo">
+                <input type="password" id="log-pass" placeholder="Mot de passe">
+                <button class="btn" onclick="login()">Connexion</button>
+                <p style="margin-top:15px; cursor:pointer; color:var(--text-muted); font-size:0.9rem;" onclick="toggleAuth('register')">Créer un compte</p>
+                <span id="auth-error" style="color:var(--danger); display:block; margin-top:10px;"></span>
+            </div>
+
+            <div class="auth-box" id="register-box" style="display:none;">
+                <h1 class="gaming-font" style="color:var(--accent)">NOUVEAU JOUEUR</h1>
+                <input type="text" id="reg-pseudo" placeholder="Pseudo">
+                <input type="password" id="reg-pass" placeholder="Mot de passe">
+                <select id="reg-country">
+                    <option value="🇫🇷">France</option>
+                    <option value="🇲🇦">Maroc</option>
+                    <option value="🇨🇦">Canada</option>
+                    <option value="🇯🇵">Japon</option>
+                    <option value="🇺🇸">USA</option>
+                    <option value="🇧🇪">Belgique</option>
+                </select>
+                <button class="btn" onclick="register()">S'inscrire</button>
+                <p style="margin-top:15px; cursor:pointer; color:var(--text-muted); font-size:0.9rem;" onclick="toggleAuth('login')">Retour Connexion</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-menu" class="screen">
+        
+        <div class="top-bar">
+            <div class="player-info-compact">
+                <span class="flag-icon" id="banner-flag">🏳️</span>
+                <span class="pseudo-text" id="banner-pseudo">...</span>
+                <span class="points-pill" id="banner-points">0 pts</span>
+                
+                <button class="logout-btn-mini" onclick="logout()" title="Déconnexion">
+                    <i class="fas fa-power-off"></i>
+                </button>
+            </div>
+
+            <div id="daily-challenge" style="font-size: 0.9rem; color: var(--accent);">Chargement défi...</div>
+        </div>
+
+        <div class="main-menu-content">
+            <h1 class="main-title gaming-font">CHESS BATTLE</h1>
+            
+            <div class="menu-grid">
+                <div class="menu-card" onclick="startGame('ai')">
+                    <i class="fas fa-robot"></i>
+                    <h3>VS ORDI</h3>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">Entraînement Solo</span>
+                </div>
+                
+                <div class="menu-card card-highlight" onclick="openFriendsModal(true)">
+                    <i class="fas fa-bolt"></i>
+                    <h3 style="color:var(--accent)">DÉFIER UN AMI</h3>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">Multijoueur Online</span>
+                </div>
+                
+                <div class="menu-card" onclick="startGame('training')">
+                    <i class="fas fa-chess-board"></i>
+                    <h3>BAC À SABLE</h3>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">Position Libre</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="btn-friends" class="corner-btn" onclick="openFriendsModal(false)" title="Amis & Invites">
+            <i class="fas fa-user-friends"></i>
+            <div id="notif-badge" class="badge" style="display:none;">0</div>
+        </div>
+        <div id="btn-settings" class="corner-btn" onclick="openSettings()" title="Réglages">
+            <i class="fas fa-cog"></i>
+        </div>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div style="width:100%; height:60px; background:var(--panel-bg); display:flex; align-items:center; justify-content:space-between; padding:0 30px; box-sizing:border-box; border-bottom:1px solid var(--border);">
+            <div class="gaming-font" style="font-size:1.2rem; color:var(--accent);" id="game-title">PARTIE EN COURS</div>
+            <button class="btn btn-small btn-red" onclick="quitGame()" style="width:auto;"><i class="fas fa-door-open"></i> QUITTER</button>
+        </div>
+
+        <div id="game-layout">
+            <div id="board-container">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="timer-box" id="timer-top">
+                        <span id="opp-name" style="font-size:1rem; margin-right:10px;">Adversaire</span>
+                        <span id="time-top">10:00</span>
+                    </div>
+                </div>
+                <div class="graveyard" id="gy-top"></div>
+
+                <div id="myBoard"></div>
+
+                <div class="graveyard" id="gy-bottom"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="timer-box" id="timer-bottom">
+                        <span id="my-name-game" style="font-size:1rem; margin-right:10px;">Moi</span>
+                        <span id="time-bottom">10:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sidebar">
+                <h3 style="color:var(--accent); text-align:center; border-bottom:1px solid var(--border); padding-bottom:10px;">HISTORIQUE</h3>
+                <div id="status-text" style="text-align:center; margin-bottom:10px; color:var(--text-muted); font-size:0.9rem;">En attente...</div>
+                <div id="move-history" style="flex-grow:1; background:rgba(0,0,0,0.3); padding:10px; overflow-y:auto; font-family:monospace; color:#ccc; border-radius:5px;"></div>
+                
+                <div id="training-tools" style="display:none; margin-top:10px;">
+                    <input type="text" id="fen-input" placeholder="Coller FEN ici...">
+                    <button class="btn btn-small" onclick="loadFen()">Charger</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-friends" class="modal-overlay">
+        <div class="modal-box">
+            <span class="close-btn" onclick="$('#modal-friends').fadeOut()">&times;</span>
+            <h2 style="color:var(--accent)"><i class="fas fa-users"></i> SOCIAL</h2>
+            
+            <div style="display:flex; gap:5px; margin-bottom:20px;">
+                <input type="text" id="friend-add-pseudo" placeholder="Pseudo exact">
+                <button class="btn btn-small" onclick="addFriend()">AJOUTER</button>
+            </div>
+
+            <h4 style="border-bottom:1px solid var(--border); margin-bottom:10px; color:var(--text-muted);">INVITATIONS</h4>
+            <div id="list-invites" style="margin-bottom:20px; min-height:30px; color:#666;">Aucune invitation</div>
+
+            <h4 style="border-bottom:1px solid var(--border); margin-bottom:10px; color:var(--text-muted);">MES AMIS</h4>
+            <div id="list-friends" style="max-height:200px; overflow-y:auto;">Chargement...</div>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal-box">
+            <span class="close-btn" onclick="$('#modal-settings').fadeOut()">&times;</span>
+            <h2 style="color:var(--accent)"><i class="fas fa-user-cog"></i> PROFIL</h2>
+            
+            <label>Modifier Pseudo</label>
+            <input type="text" id="edit-pseudo">
+            
+            <label>Titre (Bannière)</label>
+            <input type="text" id="edit-title" placeholder="Ex: Grand Maître, Le Boss...">
+            
+            <label>Pays</label>
+            <select id="edit-country">
+                <option value="🇫🇷">France</option>
+                <option value="🇲🇦">Maroc</option>
+                <option value="🇨🇦">Canada</option>
+                <option value="🇯🇵">Japon</option>
+                <option value="🇺🇸">USA</option>
+            </select>
+
+            <button class="btn" onclick="saveSettings()" style="margin-top:20px;">SAUVEGARDER</button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // TES CLES SONT INTEGREES ICI, CA VA MARCHER !
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD1wz_aGK57Ad9aVqZWj0LQt4IekLx65IY",
+            authDomain: "chessbattle-fdf1b.firebaseapp.com",
+            projectId: "chessbattle-fdf1b",
+            storageBucket: "chessbattle-fdf1b.firebasestorage.app",
+            messagingSenderId: "44354488916",
+            appId: "1:44354488916:web:e665a98637175dd51e7bc1"
+        };
+        // ============================================================
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Variables Globales
+        let currentUser = null;
+        let game = new Chess();
+        let board = null;
+        let currentMode = ''; 
+        let currentGameId = null;
+        let playerColor = 'w';
+        let currentChallenge = null;
+        
+        const CHALLENGES = [
+            { txt: "Gagner avec les Noirs", reward: 300 },
+            { txt: "Faire mat avec un Cavalier", reward: 300 },
+            { txt: "Faire mat avec un Fou", reward: 300 },
+            { txt: "Gagner avec la Dame", reward: 300 },
+            { txt: "Jouer moins de 40 coups", reward: 300 }
+        ];
+
+        // --- AUTH & USER DATA ---
+        function toggleAuth(id) {
+            $('.auth-box').hide(); $('#'+id+'-box').fadeIn(); $('#auth-error').text('');
+        }
+
+        function register() {
+            const ps = $('#reg-pseudo').val();
+            const pa = $('#reg-pass').val();
+            const co = $('#reg-country').val();
+            if(ps.length<3) return $('#auth-error').text("Pseudo trop court");
+            
+            const email = ps.toLowerCase().replace(/\s/g,'') + "@chessbattle.game";
+            auth.createUserWithEmailAndPassword(email, pa).then(cred => {
+                db.collection('users').doc(cred.user.uid).set({
+                    pseudo: ps, country: co, title: "Débutant", points: 1000, friends: [], status: 'online', uid: cred.user.uid
+                });
+            }).catch(e => $('#auth-error').text(e.message));
+        }
+
+        function login() {
+            const ps = $('#log-pseudo').val();
+            const pa = $('#log-pass').val();
+            const email = ps.toLowerCase().replace(/\s/g,'') + "@chessbattle.game";
+            auth.signInWithEmailAndPassword(email, pa).catch(e => $('#auth-error').text("Erreur connexion"));
+        }
+
+        function logout() {
+            if(currentUser) db.collection('users').doc(currentUser.uid).update({status:'offline'});
+            auth.signOut();
+            location.reload();
+        }
+
+        auth.onAuthStateChanged(user => {
+            if(user) {
+                $('.screen').removeClass('active-screen');
+                $('#screen-menu').addClass('active-screen');
+                
+                db.collection('users').doc(user.uid).onSnapshot(doc => {
+                    currentUser = doc.data();
+                    updateBanner();
+                    loadFriends();
+                    listenInvites();
+                });
+                db.collection('users').doc(user.uid).update({status:'online'});
+                
+                // Set Random Challenge
+                currentChallenge = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
+                $('#daily-challenge').html(`<i class="fas fa-bullseye"></i> Défi: ${currentChallenge.txt} (+${currentChallenge.reward} pts)`);
+            } else {
+                $('.screen').removeClass('active-screen');
+                $('#screen-auth').addClass('active-screen');
+            }
+        });
+
+        function updateBanner() {
+            $('#banner-pseudo').text(currentUser.pseudo);
+            $('#banner-flag').text(currentUser.country);
+            $('#banner-points').text((currentUser.points || 0) + " pts");
+        }
+
+        // --- REGLAGES ---
+        function openSettings() {
+            $('#edit-pseudo').val(currentUser.pseudo);
+            $('#edit-title').val(currentUser.title || "");
+            $('#edit-country').val(currentUser.country);
+            $('#modal-settings').fadeIn();
+        }
+
+        function saveSettings() {
+            const newP = $('#edit-pseudo').val();
+            const newT = $('#edit-title').val();
+            const newC = $('#edit-country').val();
+            
+            db.collection('users').doc(currentUser.uid).update({
+                pseudo: newP, title: newT, country: newC
+            }).then(() => {
+                alert("Profil mis à jour !");
+                $('#modal-settings').fadeOut();
+            });
+        }
+
+        // --- MOTEUR DE JEU ---
+        function startGame(mode) {
+            currentMode = mode;
+            game = new Chess();
+            $('#game-layout').css('display','flex');
+            $('.screen').removeClass('active-screen');
+            $('#screen-game').addClass('active-screen');
+            
+            $('#training-tools').hide();
+            $('#gy-top').empty(); $('#gy-bottom').empty();
+            
+            let config = {
+                draggable: true,
+                position: 'start',
+                // CORRECTION IMAGES
+                pieceTheme: function(piece) {
+                    return 'https://images.chesscomfiles.com/chess-themes/pieces/neo/150/' + piece.toLowerCase() + '.png';
+                },
+                onDragStart: onDragStart,
+                onDrop: onDrop,
+                onSnapEnd: () => board.position(game.fen())
+            };
+
+            if(mode === 'training') {
+                $('#game-title').text("BAC À SABLE");
+                $('#training-tools').show();
+                $('#opp-name').text("Entraînement");
+            } else if (mode === 'ai') {
+                $('#game-title').text("VS ORDINATEUR");
+                $('#opp-name').text("Robot IA");
+                playerColor = 'w';
+                config.orientation = 'white';
+            }
+
+            // Timeout pour éviter bug d'affichage
+            setTimeout(() => {
+                board = Chessboard('myBoard', config);
+                $(window).resize(board.resize);
+            }, 100);
+            
+            updateStatus();
+        }
+
+        function onDragStart(source, piece) {
+            if (currentMode === 'training') return true;
+            if (game.game_over()) return false;
+            if ((playerColor === 'w' && piece.search(/^b/) !== -1) ||
+                (playerColor === 'b' && piece.search(/^w/) !== -1)) return false;
+            if(currentMode !== 'training') {
+                 if ((game.turn() === 'w' && playerColor !== 'w') ||
+                     (game.turn() === 'b' && playerColor !== 'b')) return false;
+            }
+        }
+
+        function onDrop(source, target) {
+            let move = game.move({ from: source, to: target, promotion: 'q' });
+            if (move === null) return 'snapback';
+            if(move.captured) animateCapture(move.captured, move.color, target);
+            updateStatus();
+            if(currentMode === 'online') {
+                db.collection('games').doc(currentGameId).update({
+                    fen: game.fen(),
+                    lastMove: { from: source, to: target, color: move.color, captured: move.captured || null }
+                });
+            }
+            if(currentMode === 'ai' && !game.game_over()) {
+                window.setTimeout(makeAIMove, 250);
+            }
+            checkWinCondition();
+        }
+
+        function makeAIMove() {
+            let moves = game.moves();
+            if(moves.length === 0) return;
+            let randomMove = moves[Math.floor(Math.random() * moves.length)];
+            let move = game.move(randomMove);
+            board.position(game.fen());
+            if(move.captured) animateCapture(move.captured, move.color, move.to);
+            updateStatus();
+            checkWinCondition();
+        }
+
+        function loadFen() {
+            let fen = $('#fen-input').val();
+            if(game.load(fen)) {
+                board.position(fen);
+                updateStatus();
+            } else { alert("FEN Invalide"); }
+        }
+
+        function updateStatus() {
+            let status = '';
+            let moveColor = game.turn() === 'w' ? 'Blancs' : 'Noirs';
+
+            if(game.in_checkmate()) status = "Échec et Mat !";
+            else if(game.in_draw()) status = "Match Nul";
+            else status = "Trait aux " + moveColor;
+
+            $('#status-text').text(status);
+            let h = game.history();
+            $('#move-history').html(h.map((m,i) => (i%2==0 ? `<br>${(i/2)+1}. ${m}` : ` ${m}`)).join(''));
+            $('#move-history').scrollTop(9999);
+        }
+
+        function checkWinCondition() {
+            if(game.in_checkmate()) {
+                let winner = game.turn() === 'w' ? 'b' : 'w';
+                if(currentMode === 'ai' && winner === playerColor) {
+                    alert("VICTOIRE ! +300 PTS (Challenge réussi)");
+                    db.collection('users').doc(currentUser.uid).update({
+                        points: firebase.firestore.FieldValue.increment(300)
+                    });
+                } else if(currentMode === 'ai') {
+                    alert("Défaite...");
+                }
+            }
+        }
+
+        // --- ANIMATIONS & UI ---
+        function animateCapture(piece, color, square) {
+            let pColor = color === 'w' ? 'b' : 'w'; 
+            let imgUrl = `https://images.chesscomfiles.com/chess-themes/pieces/neo/150/${pColor}${piece.toLowerCase()}.png`;
+            let $sq = $(`.square-${square}`);
+            if(!$sq.length) return;
+            let offset = $sq.offset();
+            
+            let $clone = $(`<img src="${imgUrl}" class="flying-piece">`).css({top: offset.top, left: offset.left});
+            $('body').append($clone);
+            
+            let targetId = (color === playerColor) ? '#gy-bottom' : '#gy-top'; 
+            let $target = $(targetId);
+            let tOffset = $target.offset();
+            
+            $clone.css({
+                top: tOffset.top + 5, 
+                left: tOffset.left + ($target.children().length * 25) + 10,
+                width: '30px'
+            });
+            setTimeout(() => { $clone.remove(); $target.append(`<img src="${imgUrl}">`); }, 600);
+        }
+
+        function quitGame() {
+            if(confirm("Quitter la partie ?")) {
+                $('.screen').removeClass('active-screen');
+                $('#screen-menu').addClass('active-screen');
+            }
+        }
+
+        // --- SOCIAL (FRIENDS & ONLINE) ---
+        function openFriendsModal(onlineMode) {
+            $('#modal-friends').fadeIn();
+            if(onlineMode) alert("1. Vérifie qu'un ami est connecté (point bleu).\n2. Clique sur 'DÉFIER'.\n3. Attends qu'il accepte.");
+        }
+
+        function loadFriends() {
+            if(!currentUser.friends) return;
+            db.collection('users').onSnapshot(snap => {
+                $('#list-friends').empty();
+                snap.forEach(doc => {
+                    let u = doc.data();
+                    if(currentUser.friends.includes(u.uid)) {
+                        let isOnline = u.status === 'online';
+                        let btn = isOnline ? `<button class="btn btn-small" onclick="sendInvite('${u.uid}','${u.pseudo}')">DÉFIER</button>` : '';
+                        $('#list-friends').append(`
+                            <div class="friend-row">
+                                <div><span class="online-dot ${isOnline?'is-online':''}"></span> ${u.pseudo} (${u.points} pts)</div>
+                                ${btn}
+                            </div>
+                        `);
+                    }
+                });
+            });
+        }
+
+        function addFriend() {
+            let t = $('#friend-add-pseudo').val();
+            db.collection('users').where('pseudo','==',t).get().then(snap => {
+                if(!snap.empty) {
+                    let fid = snap.docs[0].id;
+                    let f = currentUser.friends || [];
+                    if(!f.includes(fid)) {
+                        f.push(fid);
+                        db.collection('users').doc(currentUser.uid).update({friends: f});
+                        alert("Ami ajouté !");
+                    }
+                } else alert("Joueur introuvable");
+            });
+        }
+
+        function sendInvite(toId, toName) {
+            db.collection('invites').add({ from: currentUser.uid, fromName: currentUser.pseudo, to: toId, status: 'pending' });
+            alert("Défi envoyé à " + toName + " !");
+            $('#modal-friends').fadeOut();
+            let unsub = db.collection('invites').where('from','==',currentUser.uid).onSnapshot(snap => {
+                snap.docChanges().forEach(c => {
+                    if(c.type === 'modified' && c.doc.data().status === 'accepted') {
+                        let gId = c.doc.data().gameId;
+                        joinGame(gId, 'w'); 
+                        c.doc.ref.delete();
+                        unsub();
+                    }
+                });
+            });
+        }
+
+        function listenInvites() {
+            db.collection('invites').where('to','==',currentUser.uid).where('status','==','pending').onSnapshot(snap => {
+                let count = snap.size;
+                if(count > 0) { $('#notif-badge').text(count).show(); } else { $('#notif-badge').hide(); }
+                $('#list-invites').empty();
+                snap.forEach(doc => {
+                    let inv = doc.data();
+                    $('#list-invites').append(`
+                        <div class="friend-row" style="border:1px solid var(--accent)">
+                            <span style="color:var(--accent)">${inv.fromName} te défie !</span>
+                            <div>
+                                <button class="btn btn-small" onclick="accept('${doc.id}','${inv.from}')">GO</button>
+                                <button class="btn btn-small btn-red" onclick="reject('${doc.id}')">NON</button>
+                            </div>
+                        </div>
+                    `);
+                });
+            });
+        }
+
+        function accept(iid, fromId) {
+            db.collection('games').add({ fen:'start', white: fromId, black: currentUser.uid, status:'active' }).then(ref => {
+                db.collection('invites').doc(iid).update({ status:'accepted', gameId: ref.id });
+                joinGame(ref.id, 'b');
+                $('#modal-friends').fadeOut();
+            });
+        }
+        function reject(iid) { db.collection('invites').doc(iid).update({status:'rejected'}); }
+
+        function joinGame(gId, color) {
+            currentMode = 'online';
+            currentGameId = gId;
+            playerColor = color;
+            startGame('online');
+            $('#game-title').text("MATCH ONLINE CLASSÉ");
+            $('#opp-name').text("Adversaire Online");
+            board.orientation(color === 'w' ? 'white' : 'black');
+            db.collection('games').doc(gId).onSnapshot(doc => {
+                let d = doc.data();
+                if(d.fen !== game.fen()) {
+                    let oldFen = game.fen();
+                    game.load(d.fen);
+                    board.position(d.fen);
+                    if(d.lastMove && d.lastMove.captured && d.lastMove.color !== playerColor) {
+                        animateCapture(d.lastMove.captured, d.lastMove.color, d.lastMove.to);
+                    }
+                    updateStatus();
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
